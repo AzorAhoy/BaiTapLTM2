@@ -25,13 +25,13 @@ int main(int argc, char * argv[]) {
 	openFile();
 	WSADATA wsa;
 	int ret = WSAStartup(0x0202, &wsa);
-	//if (ret == 0) {
-	//	cout << "Initialize WSA" << endl;
-	//}
-	//else {
-	//	cout << "Error while start up ";
-	//	return -4;
-	//}
+	if (ret == 0) {
+		cout << "Initialize WSA" << endl;
+	}
+	else {
+		cout << "Error while start up ";
+		return -4;
+	}
 	if (!InitializeCriticalSectionAndSpinCount(&cs, 0x00000400)) {
 		cout << "Error while intialize CRITICAL_SECTION";
 		return -3;
