@@ -9,6 +9,7 @@
 #include <string>
 
 using namespace std;
+
 DWORD WINAPI ClientThread(LPVOID);
 void Disconnect(SOCKET);
 void openFile();
@@ -22,45 +23,28 @@ int account = 0;
 int no_client = 0;
 
 int main(int argc, char * argv[]) {
-	openFile();
+
 	WSADATA wsa;
-	int ret = WSAStartup(0x0202, &wsa);
-	if (ret == 0) {
-		cout << "Initialize WSA" << endl;
-	}
-	else {
-		cout << "Error while start up ";
-		return -4;
-	}
-	if (!InitializeCriticalSectionAndSpinCount(&cs, 0x00000400)) {
-		cout << "Error while intialize CRITICAL_SECTION";
-		return -3;
-	}
+	int ret = WSAStartup(MAKEWORD(2, 2), &wsa);
+
 	int port = atoi(argv[1]);
-	if (port <= 0) {
-		cout << "Wrong port!!";
-		return -1;
-	}
-	SOCKET server = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
-	SOCKADDR_IN addrin;
-	addrin.sin_family = AF_INET;
-	addrin.sin_addr.s_addr = htonl(INADDR_ANY);
-	addrin.sin_port = htons(port);
+	SOCKET listener = socket(AF_INET, SOCK_STREAM, IPPROTO_TCP);
 
-	bind(server, (SOCKADDR*)&addrin, sizeof(addrin));
-	listen(server, 5);
+	SOCKADDR_IN addr;
+	addr.sin_family = AF_INET;
+	addr.sin_addr.s_addr = htonl(INADDR_ANY);
+	addr.sin_port = htons(port);
+
+	bind(listener, (SOCKADDR*)&addr, sizeof(addr));
+	listen(listener, 5);
+
 	while (true) {
-		SOCKET client = accept(server, NULL, NULL);
+		SOCKET client = accept(listener, NULL, NULL);
+		printf("Accept client: %d\n", client);
 		CreateThread(0, 0, ClientThread, &client, 0, 0);
 	}
-	closesocket(server);
-	for (int i = 0; i < no_client; i++)
-	{
-		closesocket(listClients[i]);
-	}
-	WSACleanup();
-	DeleteCriticalSection(&cs);
+
 	return 0;
 }
 
@@ -68,94 +52,64 @@ DWORD WINAPI ClientThread(LPVOID s) {
 	SOCKET client = *(SOCKET*)s;
 	char buf[256];
 	int ret;
-	char u[64], p[64];
+	char fileBuf[256];
+	char cmdBuf[256];
+
 	while (true) {
-		bool login = false;
-		strcpy(buf, "Nhap username va password: ");
-		send(client, buf, strlen(buf), 0);
 		ret = recv(client, buf, sizeof(buf), 0);
-		if (ret <= 0) {
-			Disconnect(client);
-			return 0;
-		}
-		sscanf(buf, "%s%s", u, p);
-		for (int i = 0; i < account; i++)
+		buf[ret] = 0;
+		printf("Received: %s\n", buf);
+
+		int found = 0;
+		FILE *f = fopen("users.txt", "r");
+		while (fgets(fileBuf, sizeof(fileBuf), f))
 		{
-			if (strcmp(u, username[i]) == 0) {
-				if (strcmp(p, password[i]) == 0) {
-					login = true;
-					cout << u << " login successfully!" << endl;
-					break;
-				}
+			if (strcmp(buf, fileBuf) == 0)
+			{
+				found = 1;
+				break;
 			}
 		}
-		if (login) break;
-		else {
-			strcpy(buf, "Sai tai khoan mat khau!!");
-			send(client, buf, strlen(buf), 0);
-			send(client, 0, 1, 0);
+		fclose(f);
+
+		if (found == 1)
+		{
+			char msg[] = "Dang nhap thanh cong. Hay nhap lenh.\n";
+			send(client, msg, strlen(msg), 0);
+		}
+		else
+		{
+			char msg[] = "Dang nhap that bai. Hay thu lai.\n";
+			send(client, msg, strlen(msg), 0);
 		}
 	}
 
-	const char output[] = ">\"C:\\Users\\\Administrator\\source\\repos\\BaiTapLTM2\\TelnetServer\\out.txt";
 	while (true) {
-		char buf[256];
+		//char buf[256];
 		ret = recv(client, buf, sizeof(buf), 0);
-		if (ret <= 0) {
-			Disconnect(client);
-			return 0;
-		}
-		buf[ret - 1] = ' ';
-		for (int i = ret; i < ret + strlen(output); i++)
+
+		buf[ret] = 0;
+		if (buf[ret - 1] == '\n')
 		{
-			buf[i] = output[i - ret];
+			buf[ret - 1] = 0;
 		}
-		buf[ret + strlen(output)] = 0;
-		cout << "Command: " << buf << endl;
-		EnterCriticalSection(&cs);
-		system(buf);
+		printf("Received: %s\n", buf);
+		printf(cmdBuf, "%s > C:\\Users\\Administrator\\source\\repos\\BaiTapLTM2\\TelnetServer\\out.txt", buf);
+		sprintf(cmdBuf, "%s > out.txt", buf);
+		system(cmdBuf);
+
 		FILE *f;
 		f = fopen("out.txt", "r");
-		do {
-			ret = fread(buf, 1, 1, f);
-			buf[ret] = 0;
-			cout << buf;
-			send(client, buf, strlen(buf), 0);
-		} while (ret > 0);
+		while (fgets(fileBuf, sizeof(fileBuf), f))
+		{
+			send(client, fileBuf, strlen(fileBuf), 0);
+		}
 		fclose(f);
-		LeaveCriticalSection(&cs);
+		//LeaveCriticalSection(&cs);
 	}
-	return 0;
+	//return 0;
 }
 
-void Disconnect(SOCKET s) {
-	cout << s << " disconnected" << endl;
-	int i = 0;
-	for (; i < no_client; i++) {
-		if (listClients[i] == s)
-			break;
-	}
-	if (i < no_client - 1) {
-		listClients[i] = listClients[no_client - 1];
-	}
-	no_client--;
-}
-
-void openFile() {
-	FILE* f;
-	f = fopen("data.txt", "r");
-	int ret = 0;
-	while (true) {
-		ret = fscanf(f, "%s%s", username[account], password[account]);
-		if (ret < 0) break;
-		account++;
-	}
-	for (int i = 0; i < account; i++)
-	{
-		cout << username[i] << ":" << password[i] << endl;
-	}
-	fclose(f);
-}
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
 // Debug program: F5 or Debug > Start Debugging menu
 

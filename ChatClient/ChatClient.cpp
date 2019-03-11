@@ -20,13 +20,13 @@ int main(int argc, char *argv[])
 
 	SOCKADDR_IN addr;
 	addr.sin_family = AF_INET;
-	addr.sin_addr.s_addr = inet_addr(argv[1]);
-	addr.sin_port = htons(atoi(argv[2]));
+	addr.sin_addr.s_addr = inet_addr("127.0.0.1");
+	addr.sin_port = htons(9000);
 
 	connect(client, (SOCKADDR *)&addr, sizeof(addr));
 
 	// Tao luong moi de nhan du lieu tu server
-	CreateThread(0, 0, ReceiverThread, &client, 0, 0);
+	//CreateThread(0, 0, ReceiverThread, &client, 0, 0);
 
 	char buf[256];
 
@@ -56,23 +56,6 @@ int main(int argc, char *argv[])
 }
 
 
-DWORD WINAPI ReceiverThread(LPVOID lpParam)
-{
-	SOCKET client = *(SOCKET *)lpParam;
-
-	char buf[256];
-	int ret;
-
-	while (true)
-	{
-		ret = recv(client, buf, sizeof(buf), 0);
-		if (ret <= 0)
-			break;
-
-		buf[ret] = 0;
-		printf("\nReceived: %s\n", buf);
-	}
-}
 // Run program: Ctrl + F5 or Debug > Start Without Debugging menu
 // Debug program: F5 or Debug > Start Debugging menu
 
